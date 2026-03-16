@@ -1,0 +1,53 @@
+stages:
+  - test
+  - build
+
+variables:
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: clawkanban_test
+  SECRET_KEY: test-secret
+
+backend-test:
+  stage: test
+  image: python:3.12-slim
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/clawkanban_test"
+  before_script:
+    - cd backend
+    - export PYTHONPATH=.
+    - export REDIS_URL="redis:""//redis:6379/0"
+    - pip install -r requirements.txt
+  script:
+    - alembic upgrade head
+    - pytest tests/ -v
+
+frontend-build:
+  stage: build
+  image: node:20-slim
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run build
+
+docker-build-backend:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t claw-kanban-backend ./backend
+
+docker-build-frontend:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t claw-kanban-frontend ./frontend
